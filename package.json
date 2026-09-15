@@ -1,9 +1,16 @@
 {
-  "name": "my-laioutr-app",
-  "version": "1.0.0",
-  "description": "My new Laioutr App",
-  "repository": "your-org/my-laioutr-app",
+  "name": "@laioutr/app-botid",
+  "version": "0.0.0",
+  "description": "Vercel BotID as the bot-protection provider for Laioutr actions",
+  "repository": "laioutr/app-botid",
   "license": "MIT",
+  "keywords": [
+    "laioutr",
+    "laioutr-app",
+    "vercel",
+    "botid",
+    "bot-protection"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.15.0",
   "exports": {
@@ -22,8 +29,8 @@
   },
   "files": [
     "dist"
-],
-"scripts": {
+  ],
+  "scripts": {
     "dev": "npm run dev:prepare && nuxi dev playground",
     "dev:build": "nuxi build playground",
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
@@ -41,11 +48,12 @@
   ],
   "dependencies": {
     "@nuxt/kit": "3.16.2",
-    "zod": "3.25.61"
+    "@opentelemetry/api": "^1.9.0",
+    "botid": "1.5.11",
+    "defu": "6.1.4"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
-    "@laioutr-app/ui": "^2.8.2",
     "@laioutr-core/devtools": "^0.37.1",
     "@laioutr/eslint-config": "^1.8.8",
     "@laioutr/prettier-config": "^1.1.0",
@@ -53,21 +61,19 @@
     "@nuxt/module-builder": "1.0.1",
     "@nuxt/schema": "3.16.2",
     "@nuxt/test-utils": "3.19.1",
-    "@pinia/colada": "0.17.1",
-    "@pinia/colada-nuxt": "0.2.1",
     "@types/node": "latest",
-    "@vueuse/core": "13.1.0",
     "eslint": "^9.35.0",
     "nuxt": "3.16.2",
-    "pinia": "3.0.2",
     "typescript": "5.9.2",
     "vitest": "3.1.1",
     "vue-tsc": "2.2.10"
   },
   "peerDependencies": {
-    "@laioutr-core/canonical-types": ">=0.26.2",
-    "@laioutr-core/core-types": ">=0.37.1",
-    "@laioutr-core/frontend-core": ">=0.37.1"
+    "@laioutr-core/frontend-core": ">=0.55.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=22.12.0",

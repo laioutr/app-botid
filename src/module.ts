@@ -1,67 +1,59 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
-import { createResolver, defineNuxtModule, installModule } from '@nuxt/kit';
+import { addPlugin, addServerPlugin, createResolver, defineNuxtModule, installModule, useLogger } from '@nuxt/kit';
+import botIdModule from 'botid/nuxt';
 import { defu } from 'defu';
-import { registerLaioutrApp } from '@laioutr-core/kit';
-import { name, version } from '../package.json';
+import { botIdVercelRoutes } from './module/botIdVercelRoutes';
+import type { NuxtModule } from '@nuxt/schema';
+import { name as pkgName, version as pkgVersion } from '../package.json';
 
-/**
- * The options the module adds to the nuxt.config.ts.
- */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ModuleOptions {}
 
-/**
- * The config the module adds to nuxt.runtimeConfig.public['my-laioutr-app']
- */
-export interface RuntimeConfigModulePublic {}
-
-/**
- * The config the module adds to nuxt.runtimeConfig['my-laioutr-app']
- */
-export interface RuntimeConfigModulePrivate extends ModuleOptions {}
-
-export default defineNuxtModule<ModuleOptions>({
+const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
   meta: {
-    name,
-    version,
-    configKey: name, // configKey must match package name
+    name: pkgName,
+    version: pkgVersion,
+    configKey: pkgName,
   },
-  // Default configuration options of the Nuxt module
-  defaults: {},
   async setup(_options, nuxt) {
+    const logger = useLogger(pkgName);
     const { resolve } = createResolver(import.meta.url);
     const resolveRuntimeModule = (path: string) => resolve('./runtime', path);
 
     nuxt.options.build.transpile.push(resolve('./runtime'));
 
-    // Runtime configuration for this module
-    // These two statements can be removed if you don't provide a runtime config
-    nuxt.options.runtimeConfig[name] = defu(nuxt.options.runtimeConfig[name] as Parameters<typeof defu>[0], _options);
-    nuxt.options.runtimeConfig.public[name] = defu(nuxt.options.runtimeConfig.public[name] as Parameters<typeof defu>[0], _options);
+    // frontend-core reads this to warn when protected actions have no provider. Either module may run first.
+    (nuxt.options.runtimeConfig as any).laioutr = defu(
+      { botProtection: { provider: 'botid' } },
+      (nuxt.options.runtimeConfig as any).laioutr
+    );
 
-    await registerLaioutrApp({
-      name,
-      version,
-      orchestrDirs: [resolveRuntimeModule('server/orchestr')],
-      sections: [resolveRuntimeModule('app/sections')],
-      blocks: [resolveRuntimeModule('app/blocks')],
-    });
-
-    // Install peer-dependency modules only on prepare-step.
-    // This makes auto-imports and import-aliases work. Remove any modules you might not need.
     if (nuxt.options._prepare) {
-      await installModule('@nuxt/image');
       await installModule('@laioutr-core/frontend-core');
-      await installModule('@laioutr-core/orchestr');
-      await installModule('@laioutr-app/ui');
+      return;
     }
 
-    // Shared
-    // Imports and other stuff which is shared between client and server
+    // Installed from the imported function: by name it would resolve from the project's node_modules,
+    // where `botid` is only a transitive dependency.
+    await installModule(botIdModule);
 
-    // Client
-    // Add plugins, composables, etc.
+    nuxt.options.nitro.vercel ??= {};
+    nuxt.options.nitro.vercel.config ??= {};
+    nuxt.options.nitro.vercel.config.routes = [
+      ...botIdVercelRoutes(nuxt.options.routeRules ?? {}),
+      ...(nuxt.options.nitro.vercel.config.routes ?? []),
+    ];
 
-    // Server
-    // Add server-only imports, etc.
+    nuxt.hook('nitro:init', (nitro) => {
+      if (!nuxt.options.dev && !String(nitro.options.preset).startsWith('vercel')) {
+        logger.warn(
+          `BotID runs only on Vercel, but this build targets "${nitro.options.preset}". Every protected action will be rejected at runtime.`
+        );
+      }
+    });
+
+    addPlugin({ src: resolveRuntimeModule('app/plugins/botId.client'), mode: 'client' });
+    addServerPlugin(resolveRuntimeModule('server/plugins/botIdVerifier'));
   },
 });
+
+export default module;
