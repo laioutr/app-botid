@@ -21,20 +21,25 @@ pnpm vitest run src/path/to/file.test.ts   # a single suite
 
 ## Architecture
 
-`src/module.ts` is the Nuxt module entry: it registers runtime config, server routes, public assets
-and page types, and hands the Orchestr directory to `registerLaioutrApp`.
+The app makes Vercel BotID the bot-protection provider of a Laioutr storefront. frontend-core owns the
+contract, the project config (`config.botProtection` in the laioutrrc), the outage policy and the
+errors. This app fills in the two provider halves:
 
-**Orchestr handler types**, by filename suffix under `src/runtime/server/orchestr/<entity>/`:
+- `src/module.ts` names the provider in `runtimeConfig.laioutr.botProtection.provider`, installs
+  `botid/nuxt`, writes Vercel edge rewrites for BotID's challenge paths, and registers the plugins.
+- `src/module/botIdVercelRoutes.ts` derives those rewrites from the route rules `botid/nuxt` installs.
+  The route rules alone break on Vercel: the function proxies the challenge and BotID classifies every
+  visitor as a bot.
+- `src/runtime/app/` installs the client adapter through `useBotProtection().setAdapter`. BotID wraps
+  `fetch` and attaches its own headers, so `prepare()` returns `{}`.
+- `src/runtime/server/` registers the verifier through `setBotProtectionVerifier`, only where BotID can
+  answer (development, or production on Vercel).
 
-- `*.query.ts` — fetch and return entity IDs
-- `*.link.ts` — relationships between entities
-- `*.resolver.ts` — resolve data components for an entity
-- `*.action.ts` — mutations and side effects
-- `*.page-index.ts` — enumerate a page type's entities and resolve a URL back to one
-- `*.template.ts` — preset, labelled query inputs an editor picks from in Studio
+Keep the check level at `basic`. Deep Analysis is out of scope, and the Vercel dashboard toggle for it
+overrides whatever the app configures.
 
-Canonical entity types come from `@laioutr-core/canonical-types`. Apps consume them and do not define
-them — a shape that feels wrong belongs upstream, not patched locally.
+Only a real Vercel deployment proves BotID. Unit tests cover the verdict mapping and the rewrites;
+check anything about the challenge flow on a preview deployment.
 
 ## Rules
 
@@ -65,18 +70,6 @@ the resolved default, runs after) post-processes. Seed the same slot you read.
 Do not put a filter hook inside a composable that merely computes and returns a value — the caller
 already owns that value. Put it where the value is applied on the app's behalf.
 
-### Money
-
-Money is `{ amount, currency }` where `amount` is **minor units (cents)** and `currency` is an
-**ISO 4217 code** (`EUR`, `USD`) — never a symbol, never a label, never lowercase. Default to `EUR`
-in fixtures unless the currency is material.
-
-```ts
-{ amount: 1999, currency: 'EUR' }   // ✅
-{ amount: 19.99, currency: 'EUR' }  // ✘ must be cents
-{ amount: 1999, currency: '€' }     // ✘ symbol
-```
-
 ### Comments
 
 Comments explain **why**. The code already says what. The failure mode here is over-commenting.
@@ -100,20 +93,15 @@ wanted the reason, not a filing reference. State it inline in a clause instead.
 Real external identifiers are fine: ticket keys, RFC numbers, published spec sections, CVEs,
 upstream issue URLs.
 
-### Sections and blocks
+### Tests
 
 Do not write Vue component tests — no mounting, no Vue Test Utils, no component snapshots — unless
 explicitly asked. Tests for composables, helpers and pure logic are wanted.
 
 Prefer plain `defineConfig` in `vitest.config.ts` for pure-function suites. `@nuxt/test-utils`'
 `defineVitestConfig` boots a Nuxt instance and pulls in happy-dom to build a DOM those suites never
-touch, and it regenerates the root `.nuxt` without the playground's config. Reserve it for tests that
-genuinely need the Nuxt environment, like the e2e fixture in `test/`.
-
-`defineSection`'s `studio.description` carries the load for both humans and agents. The optional `ai`
-metadata takes only `description` and `examples`, and **an absent `ai` object is the normal state**.
-When present it states declarative, non-inferable facts — never use/avoid/never guidance, which
-measurably degrades composition, and never anything already visible in the schema.
+touch, and it regenerates the root `.nuxt` without the playground's config. Reserve it for a test that
+genuinely needs the Nuxt environment.
 
 ### Changesets
 
