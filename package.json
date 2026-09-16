@@ -1,6 +1,6 @@
 {
   "name": "@laioutr/app-botid",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Vercel BotID as the bot-protection provider for Laioutr actions",
   "repository": "laioutr/app-botid",
   "license": "MIT",
